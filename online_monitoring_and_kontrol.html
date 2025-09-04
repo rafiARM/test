@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 MQTT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .dashboard {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      width: 400px;
+      text-align: center;
+    }
+    h2 { 
+      color: #333; 
+      margin-bottom: 20px;
+    }
+    .value {
+      font-size: 28px;
+      color: #0078d7;
+      margin: 15px 0;
+      font-weight: bold;
+    }
+    canvas {
+      margin: 20px 0;
+    }
+    button {
+      padding: 12px 25px;
+      margin: 8px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+    .on { background: #28a745; color: white; }
+    .off { background: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <h2>⚡ ESP32 Monitoring & Control</h2>
+    <p>Tegangan Saat Ini:</p>
+    <div class="value" id="tegangan">-- V</div>
+    <canvas id="gaugeChart" width="300" height="200"></canvas>
+    <div>
+      <button class="on" onclick="publish('ON')">ON</button>
+      <button class="off" onclick="publish('OFF')">OFF</button>
+    </div>
+  </div>
+
+  <script>
+    // ================= MQTT CONFIG =================
+    const options = {
+      username: "admin",
+      password: "1q2w3e4Z"
+    };
+
+    const client = mqtt.connect("wss://b0992134890a43408126672779301582.s1.eu.hivemq.cloud:8884/mqtt", options);
+
+    client.on("connect", () => {
+      console.log("✅ Terhubung ke MQTT Broker!");
+      client.subscribe("esp32/tegangan");
+    });
+
+    // ================= GAUGE CHART =================
+    const ctx = document.getElementById('gaugeChart').getContext('2d');
+    const gaugeChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Tegangan', 'Sisa'],
+        datasets: [{
+          data: [0, 250], // awal 0 V, max 250 V
+          backgroundColor: ['#0078d7', '#e0e0e0'],
+          borderWidth: 0,
+          cutout: '75%',
+          rotation: -90,
+          circumference: 180
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // ================= MQTT EVENT =================
+    client.on("message", (topic, message) => {
+      if (topic === "esp32/tegangan") {
+        const voltage = parseInt(message.toString());
+        document.getElementById("tegangan").innerText = voltage + " V";
+
+        // update gauge
+        gaugeChart.data.datasets[0].data[0] = voltage;
+        gaugeChart.data.datasets[0].data[1] = 250 - voltage;
+        gaugeChart.update();
+      }
+    });
+
+    function publish(msg) {
+      client.publish("esp32/kontrol", msg);
+    }
+  </script>
+</body>
+</html>
